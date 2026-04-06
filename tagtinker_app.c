@@ -29,6 +29,42 @@ static bool custom_event_cb(void* ctx, uint32_t event) {
 
 extern const SceneManagerHandlers tagtinker_scene_handlers;
 
+void tagtinker_settings_load(TagTinkerApp* app) {
+    app->show_startup_warning = true;
+
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    File* file = storage_file_alloc(storage);
+
+    if(storage_file_open(file, APP_DATA_PATH("settings.txt"), FSAM_READ, FSOM_OPEN_EXISTING)) {
+        char value = '1';
+        if(storage_file_read(file, &value, 1) == 1) {
+            app->show_startup_warning = (value != '0');
+        }
+        storage_file_close(file);
+    }
+
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+}
+
+bool tagtinker_settings_save(const TagTinkerApp* app) {
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    storage_common_mkdir(storage, APP_DATA_PATH(""));
+
+    File* file = storage_file_alloc(storage);
+    bool ok = false;
+
+    if(storage_file_open(file, APP_DATA_PATH("settings.txt"), FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+        const char value = app->show_startup_warning ? '1' : '0';
+        ok = (storage_file_write(file, &value, 1) == 1);
+        storage_file_close(file);
+    }
+
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+    return ok;
+}
+
 void tagtinker_targets_load(TagTinkerApp* app) {
     app->target_count = 0;
 
@@ -127,6 +163,7 @@ static TagTinkerApp* app_alloc(void) {
     app->invert_text = false;
     strcpy(app->text_input_buf, "TagTinker");
     app->selected_target = -1;
+    tagtinker_settings_load(app);
     tagtinker_targets_load(app);
 
     /* Scene manager */
@@ -236,7 +273,9 @@ static void app_free(TagTinkerApp* app) {
 int32_t tagtinker_app_main(void* p) {
     UNUSED(p);
     TagTinkerApp* app = app_alloc();
-    scene_manager_next_scene(app->scene_manager, TagTinkerSceneMainMenu);
+    scene_manager_next_scene(
+        app->scene_manager,
+        app->show_startup_warning ? TagTinkerSceneWarning : TagTinkerSceneMainMenu);
     view_dispatcher_run(app->view_dispatcher);
     app_free(app);
     return 0;

@@ -7,7 +7,9 @@
 #include <gui/scene_manager.h>
 
 typedef enum {
+    TagTinkerSceneWarning,
     TagTinkerSceneMainMenu,
+    TagTinkerSceneSettings,
     TagTinkerSceneBroadcastMenu,
     TagTinkerSceneBroadcast,
     TagTinkerSceneTargetMenu,
@@ -23,9 +25,17 @@ typedef enum {
 } TagTinkerScene;
 
 /* Scene handler declarations */
+void tagtinker_scene_warning_on_enter(void* ctx);
+bool tagtinker_scene_warning_on_event(void* ctx, SceneManagerEvent event);
+void tagtinker_scene_warning_on_exit(void* ctx);
+
 void tagtinker_scene_main_menu_on_enter(void* ctx);
 bool tagtinker_scene_main_menu_on_event(void* ctx, SceneManagerEvent event);
 void tagtinker_scene_main_menu_on_exit(void* ctx);
+
+void tagtinker_scene_settings_on_enter(void* ctx);
+bool tagtinker_scene_settings_on_event(void* ctx, SceneManagerEvent event);
+void tagtinker_scene_settings_on_exit(void* ctx);
 
 void tagtinker_scene_broadcast_menu_on_enter(void* ctx);
 bool tagtinker_scene_broadcast_menu_on_event(void* ctx, SceneManagerEvent event);

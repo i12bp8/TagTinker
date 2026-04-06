@@ -86,6 +86,7 @@ struct TagTinkerApp {
     uint16_t repeats;
     bool forever;
     bool tx_spam;
+    bool show_startup_warning;
 
     /* Current target */
     char barcode[TAGTINKER_BC_LEN + 1];
@@ -140,6 +141,8 @@ struct TagTinkerApp {
 typedef enum {
     TagTinkerMenuBroadcast,
     TagTinkerMenuTargetESL,
+    TagTinkerMenuSettings,
+    TagTinkerMenuAndroid,
     TagTinkerMenuAbout,
 } TagTinkerMainMenuItem;
 
@@ -156,5 +159,7 @@ typedef enum {
     TagTinkerTargetPingFlash,
 } TagTinkerTargetActionItem;
 
+void tagtinker_settings_load(TagTinkerApp* app);
+bool tagtinker_settings_save(const TagTinkerApp* app);
 void tagtinker_targets_load(TagTinkerApp* app);
 bool tagtinker_targets_save(const TagTinkerApp* app);
