@@ -17,10 +17,10 @@ void tagtinker_scene_target_menu_on_enter(void* ctx) {
     TagTinkerApp* app = ctx;
 
     submenu_reset(app->submenu);
-    submenu_set_header(app->submenu, "Target Tag");
+    submenu_set_header(app->submenu, "Targeted Payloads");
 
     /* Add new target */
-    submenu_add_item(app->submenu, "+ Add Tag", TargetMenuAddNew, target_menu_cb, app);
+    submenu_add_item(app->submenu, "+ New Target", TargetMenuAddNew, target_menu_cb, app);
 
     /* List saved targets */
     for(uint8_t i = 0; i < app->target_count; i++) {

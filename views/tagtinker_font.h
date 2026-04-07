@@ -134,7 +134,7 @@ static inline void set_region_pixel(
  * bg_val/fg_val control polarity:
  *   Normal:   bg=1 (white), fg=0 (black)
  *   Inverted: bg=0 (black), fg=1 (white)
- * Zero margin — text fills edge to edge.
+ * No outer margin is added.
  */
 static inline void render_text_ex(uint8_t* buf, uint16_t w, uint16_t h,
                                    const char* text, uint8_t bg_val, uint8_t fg_val) {

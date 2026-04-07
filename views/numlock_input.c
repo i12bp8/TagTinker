@@ -1,8 +1,5 @@
 /*
- * TagTinker — Number Lock Barcode Input
- *
- * Clean centered barcode entry: 1 letter + 16 digits in groups of 4.
- * UP/DOWN cycle, LEFT/RIGHT move, OK confirm, BACK cancel.
+ * Barcode input view.
  */
 
 #include "numlock_input.h"
@@ -28,7 +25,7 @@ static uint8_t prefix_x(void) {
 
 static uint8_t digit_x(uint8_t i) {
     uint8_t groups = i / GROUP_SIZE;
-    /* Spread across horizontal: Prefix(8) + 16 chars(6) + 3 gaps(5) = 119. Left margin = 4. */
+    /* Keep the full code centered across the 128 px canvas. */
     return 4 + 8 + i * CHAR_W + groups * GROUP_GAP;
 }
 
@@ -36,7 +33,6 @@ static void numlock_draw(Canvas* canvas, void* model_v) {
     NumlockModel* m = model_v;
     canvas_clear(canvas);
 
-    /* 1. Header Bar — Inverted Tech Banner */
     canvas_set_color(canvas, ColorBlack);
     canvas_draw_box(canvas, 0, 0, 128, 12);
     canvas_set_color(canvas, ColorWhite);
@@ -44,17 +40,14 @@ static void numlock_draw(Canvas* canvas, void* model_v) {
     canvas_draw_str_aligned(canvas, 64, 6, AlignCenter, AlignCenter, "SET BARCODE");
     canvas_set_color(canvas, ColorBlack);
 
-    /* 2. Main Input Frame — Heavy industrial border */
     int frame_y = 19;
     int frame_h = 24;
     canvas_draw_rframe(canvas, 1, frame_y, 126, frame_h, 2);
-    /* Inner shadow/border detail */
     canvas_draw_line(canvas, 2, frame_y+1, 125, frame_y+1);
 
     const uint8_t baseline = 36;
     canvas_set_font(canvas, FontPrimary);
 
-    /* Editable letter prefix */
     char prefix[2] = {m->prefix, '\0'};
     if(m->cursor == 0) {
         uint8_t x = prefix_x();
@@ -75,45 +68,34 @@ static void numlock_draw(Canvas* canvas, void* model_v) {
         canvas_draw_str(canvas, prefix_x(), baseline, prefix);
     }
 
-    /* Iterating Digits */
     for(uint8_t i = 0; i < NUM_DIGITS; i++) {
         uint8_t x = digit_x(i);
         char ch[2] = {'0' + m->digits[i], '\0'};
 
         if((i + 1) == m->cursor) {
-            /* Selected digit bounding block */
             canvas_draw_box(canvas, x - 1, frame_y + 3, CHAR_W + 2, frame_h - 6);
             canvas_set_color(canvas, ColorWhite);
             canvas_draw_str(canvas, x, baseline, ch);
             canvas_set_color(canvas, ColorBlack);
-            
-            /* Sharp Navigator Arrows pointing at selection */
-            uint8_t cx = x + CHAR_W / 2 - 1; /* Center of char */
-            
-            /* Up pointer */
+
+            uint8_t cx = x + CHAR_W / 2 - 1;
             canvas_draw_line(canvas, cx, frame_y - 4, cx - 2, frame_y - 2);
             canvas_draw_line(canvas, cx, frame_y - 4, cx + 2, frame_y - 2);
-            canvas_draw_line(canvas, cx, frame_y - 4, cx, frame_y - 1); 
-            
-            /* Down pointer */
+            canvas_draw_line(canvas, cx, frame_y - 4, cx, frame_y - 1);
+
             canvas_draw_line(canvas, cx, frame_y + frame_h + 3, cx - 2, frame_y + frame_h + 1);
             canvas_draw_line(canvas, cx, frame_y + frame_h + 3, cx + 2, frame_y + frame_h + 1);
-            canvas_draw_line(canvas, cx, frame_y + frame_h + 3, cx, frame_y + frame_h); 
-            
+            canvas_draw_line(canvas, cx, frame_y + frame_h + 3, cx, frame_y + frame_h);
         } else {
-            /* Standard unselected digit */
             canvas_draw_str(canvas, x, baseline, ch);
         }
     }
 
-    /* 3. Footer UI with Clean Button Callouts */
     canvas_set_font(canvas, FontSecondary);
-    
-    /* D-Pad Hint Icons */
-    canvas_draw_str(canvas, 2, 59, "<\x12\x13> Sel"); 
+
+    canvas_draw_str(canvas, 2, 59, "<\x12\x13> Sel");
     canvas_draw_str(canvas, 45, 59, "^\x18\x19v Set");
 
-    /* Thick OK Button */
     canvas_draw_rbox(canvas, 92, 48, 34, 14, 2);
     canvas_set_color(canvas, ColorWhite);
     canvas_draw_str_aligned(canvas, 109, 55, AlignCenter, AlignCenter, "Hold OK");

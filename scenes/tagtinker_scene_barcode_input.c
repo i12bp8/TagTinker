@@ -1,13 +1,11 @@
 /*
- * Barcode Input — custom barcode selector
- * User enters 1 letter + 16 digits with arrow keys.
+ * Barcode input scene.
  */
 
 #include "../tagtinker_app.h"
 
 static void numlock_done(void* ctx, const char* barcode) {
     TagTinkerApp* app = ctx;
-    /* Copy result to app barcode buffer */
     strncpy(app->barcode, barcode, TAGTINKER_BC_LEN);
     app->barcode[TAGTINKER_BC_LEN] = '\0';
     view_dispatcher_send_custom_event(app->view_dispatcher, 0);
@@ -45,31 +43,7 @@ bool tagtinker_scene_barcode_input_on_event(void* ctx, SceneManagerEvent event) 
     FURI_LOG_I(TAGTINKER_TAG, "Barcode: %s -> PLID %02X%02X%02X%02X",
         app->barcode, app->plid[3], app->plid[2], app->plid[1], app->plid[0]);
 
-    /* Auto-save target */
-    bool exists = false;
-    for(uint8_t i = 0; i < app->target_count; i++) {
-        if(strcmp(app->targets[i].barcode, app->barcode) == 0) {
-            exists = true;
-            app->selected_target = i;
-            break;
-        }
-    }
-    if(!exists && app->target_count < TAGTINKER_MAX_TARGETS) {
-        TagTinkerTarget* t = &app->targets[app->target_count];
-        memcpy(t->barcode, app->barcode, TAGTINKER_BC_LEN + 1);
-        memcpy(t->plid, app->plid, 4);
-        char suffix[7];
-        memcpy(suffix, app->barcode + TAGTINKER_BC_LEN - 6, 6);
-        suffix[6] = '\0';
-        snprintf(t->name, TAGTINKER_TARGET_NAME_LEN, "Tag ...%s", suffix);
-        tagtinker_target_refresh_profile(t);
-        app->selected_target = app->target_count;
-        app->target_count++;
-
-        if(!tagtinker_targets_save(app)) {
-            FURI_LOG_W(TAGTINKER_TAG, "Failed to save targets");
-        }
-    }
+    app->selected_target = tagtinker_ensure_target(app, app->barcode);
 
     if(app->selected_target >= 0) {
         tagtinker_select_target(app, (uint8_t)app->selected_target);

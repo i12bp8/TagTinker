@@ -1,5 +1,5 @@
 /*
- * Size Picker — exact native sizes plus a useful custom range.
+ * Size picker scene.
  */
 
 #include "../tagtinker_app.h"
@@ -31,7 +31,6 @@ static const char* compression_labels[] = {"Auto", "Raw", "RLE"};
 #define H_COUNT COUNT_OF(height_values)
 #define COORD_COUNT COUNT_OF(coord_values)
 
-/* Setting indices */
 enum {
     SettingWidth,
     SettingHeight,
@@ -45,8 +44,6 @@ enum {
     SettingSave,
     SettingTransmit,
 };
-
-/* ── Callbacks ── */
 
 static void clamp_current_offsets(TagTinkerApp* app);
 
@@ -235,8 +232,6 @@ static void setting_cb(void* ctx, uint32_t index) {
     app->tx_spam = false;
     scene_manager_next_scene(app->scene_manager, TagTinkerSceneTransmit);
 }
-
-/* ── Scene handlers ── */
 
 void tagtinker_scene_size_picker_on_enter(void* ctx) {
     TagTinkerApp* app = ctx;

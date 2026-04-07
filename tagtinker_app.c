@@ -59,6 +59,231 @@ void tagtinker_target_refresh_profile(TagTinkerTarget* target) {
     tagtinker_barcode_to_profile(target->barcode, &target->profile);
 }
 
+void tagtinker_target_set_default_name(TagTinkerTarget* target) {
+    if(!target) return;
+
+    if(strlen(target->barcode) < 6U) {
+        snprintf(target->name, sizeof(target->name), "Tag");
+        return;
+    }
+
+    char suffix[7];
+    memcpy(suffix, target->barcode + TAGTINKER_BC_LEN - 6, 6);
+    suffix[6] = '\0';
+    snprintf(target->name, sizeof(target->name), "Tag ...%s", suffix);
+}
+
+int8_t tagtinker_find_target_by_barcode(const TagTinkerApp* app, const char* barcode) {
+    if(!app || !barcode || !*barcode) return -1;
+
+    for(uint8_t i = 0; i < app->target_count; i++) {
+        if(strcmp(app->targets[i].barcode, barcode) == 0) {
+            return (int8_t)i;
+        }
+    }
+
+    return -1;
+}
+
+int8_t tagtinker_ensure_target(TagTinkerApp* app, const char* barcode) {
+    if(!app || !barcode) return -1;
+
+    int8_t existing = tagtinker_find_target_by_barcode(app, barcode);
+    if(existing >= 0) return existing;
+    if(app->target_count >= TAGTINKER_MAX_TARGETS) return -1;
+
+    TagTinkerTarget* target = &app->targets[app->target_count];
+    memset(target, 0, sizeof(*target));
+    strncpy(target->barcode, barcode, TAGTINKER_BC_LEN);
+    target->barcode[TAGTINKER_BC_LEN] = '\0';
+
+    if(!tagtinker_barcode_to_plid(target->barcode, target->plid)) {
+        memset(target, 0, sizeof(*target));
+        return -1;
+    }
+
+    tagtinker_target_set_default_name(target);
+    tagtinker_target_refresh_profile(target);
+    app->target_count++;
+    tagtinker_targets_save(app);
+    return (int8_t)(app->target_count - 1U);
+}
+
+bool tagtinker_find_latest_synced_image(
+    const TagTinkerApp* app,
+    const char* barcode,
+    TagTinkerSyncedImage* image) {
+    if(!app || !barcode || !*barcode || !image) return false;
+
+    bool found = false;
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    File* file = storage_file_alloc(storage);
+
+    if(storage_file_open(file, APP_DATA_PATH("synced_images.txt"), FSAM_READ, FSOM_OPEN_EXISTING)) {
+        uint64_t size = storage_file_size(file);
+        if(size > 0U && size < 8192U) {
+            char* buf = malloc((size_t)size + 1U);
+            if(buf) {
+                uint16_t read = storage_file_read(file, buf, (uint16_t)size);
+                buf[read] = '\0';
+
+                char* line = buf;
+                while(line && *line) {
+                    char* nl = strchr(line, '\n');
+                    if(nl) *nl = '\0';
+
+                    if(*line) {
+                        char* cursor = line;
+                        char* job_id = cursor;
+                        char* current_barcode = strchr(cursor, '|');
+                        if(current_barcode) *current_barcode++ = '\0';
+                        char* width = current_barcode ? strchr(current_barcode, '|') : NULL;
+                        if(width) *width++ = '\0';
+                        char* height = width ? strchr(width, '|') : NULL;
+                        if(height) *height++ = '\0';
+                        char* page = height ? strchr(height, '|') : NULL;
+                        if(page) *page++ = '\0';
+                        char* path = page ? strchr(page, '|') : NULL;
+                        if(path) *path++ = '\0';
+
+                        if(job_id && current_barcode && width && height && page && path &&
+                           strcmp(current_barcode, barcode) == 0 && storage_common_exists(storage, path)) {
+                            strncpy(image->job_id, job_id, TAGTINKER_SYNC_JOB_ID_LEN);
+                            image->job_id[TAGTINKER_SYNC_JOB_ID_LEN] = '\0';
+                            strncpy(image->barcode, current_barcode, TAGTINKER_BC_LEN);
+                            image->barcode[TAGTINKER_BC_LEN] = '\0';
+                            image->width = (uint16_t)atoi(width);
+                            image->height = (uint16_t)atoi(height);
+                            image->page = (uint8_t)atoi(page);
+                            strncpy(image->image_path, path, TAGTINKER_IMAGE_PATH_LEN);
+                            image->image_path[TAGTINKER_IMAGE_PATH_LEN] = '\0';
+                            found = true;
+                        }
+                    }
+
+                    line = nl ? (nl + 1) : NULL;
+                }
+
+                free(buf);
+            }
+        }
+
+        storage_file_close(file);
+    }
+
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+    return found;
+}
+
+size_t tagtinker_delete_synced_images_for_barcode(TagTinkerApp* app, const char* barcode) {
+    UNUSED(app);
+
+    if(!barcode || !*barcode) return 0U;
+
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    File* file = storage_file_alloc(storage);
+    size_t removed_count = 0U;
+
+    if(storage_file_open(file, APP_DATA_PATH("synced_images.txt"), FSAM_READ, FSOM_OPEN_EXISTING)) {
+        uint64_t size = storage_file_size(file);
+        if(size > 0U && size < 8192U) {
+            char* input = malloc((size_t)size + 1U);
+            char* output = malloc((size_t)size + 1U);
+            if(input && output) {
+                uint16_t read = storage_file_read(file, input, (uint16_t)size);
+                input[read] = '\0';
+                output[0] = '\0';
+                size_t output_len = 0U;
+
+                char* line = input;
+                while(line && *line) {
+                    char* nl = strchr(line, '\n');
+                    if(nl) *nl = '\0';
+
+                    if(*line) {
+                        char line_copy[384];
+                        snprintf(line_copy, sizeof(line_copy), "%s", line);
+
+                        char* cursor = line;
+                        char* job_id = cursor;
+                        char* current_barcode = strchr(cursor, '|');
+                        if(current_barcode) *current_barcode++ = '\0';
+                        char* width = current_barcode ? strchr(current_barcode, '|') : NULL;
+                        if(width) *width++ = '\0';
+                        char* height = width ? strchr(width, '|') : NULL;
+                        if(height) *height++ = '\0';
+                        char* page = height ? strchr(height, '|') : NULL;
+                        if(page) *page++ = '\0';
+                        char* path = page ? strchr(page, '|') : NULL;
+                        if(path) *path++ = '\0';
+
+                        bool matches =
+                            job_id && current_barcode && width && height && page && path &&
+                            strcmp(current_barcode, barcode) == 0;
+                        if(matches) {
+                            storage_common_remove(storage, path);
+                            removed_count++;
+                        } else {
+                            size_t line_len = strlen(line_copy);
+                            if((output_len + line_len + 1U) < ((size_t)size + 1U)) {
+                                memcpy(output + output_len, line_copy, line_len);
+                                output_len += line_len;
+                                output[output_len++] = '\n';
+                                output[output_len] = '\0';
+                            }
+                        }
+                    }
+
+                    line = nl ? (nl + 1) : NULL;
+                }
+
+                storage_file_close(file);
+                if(output_len == 0U) {
+                    storage_common_remove(storage, APP_DATA_PATH("synced_images.txt"));
+                } else if(
+                    storage_file_open(
+                        file, APP_DATA_PATH("synced_images.txt"), FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+                    storage_file_write(file, output, (uint16_t)output_len);
+                    storage_file_close(file);
+                }
+            } else {
+                storage_file_close(file);
+            }
+
+            free(output);
+            free(input);
+        } else {
+            storage_file_close(file);
+        }
+    }
+
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+    return removed_count;
+}
+
+bool tagtinker_delete_target(TagTinkerApp* app, uint8_t index) {
+    if(!app || index >= app->target_count) return false;
+
+    tagtinker_delete_synced_images_for_barcode(app, app->targets[index].barcode);
+
+    if(index + 1U < app->target_count) {
+        memmove(
+            &app->targets[index],
+            &app->targets[index + 1U],
+            sizeof(TagTinkerTarget) * (size_t)(app->target_count - index - 1U));
+    }
+    memset(&app->targets[app->target_count - 1U], 0, sizeof(TagTinkerTarget));
+    app->target_count--;
+    app->selected_target = -1;
+    app->barcode[0] = '\0';
+    memset(app->plid, 0, sizeof(app->plid));
+    app->barcode_valid = false;
+
+    return tagtinker_targets_save(app);
+}
+
 bool tagtinker_target_supports_graphics(const TagTinkerTarget* target) {
     if(!target) return false;
 
@@ -299,10 +524,7 @@ void tagtinker_targets_load(TagTinkerApp* app) {
                         strncpy(target->name, sep + 1, TAGTINKER_TARGET_NAME_LEN);
                         target->name[TAGTINKER_TARGET_NAME_LEN] = '\0';
                     } else {
-                        char suffix[7];
-                        memcpy(suffix, target->barcode + TAGTINKER_BC_LEN - 6, 6);
-                        suffix[6] = '\0';
-                        snprintf(target->name, TAGTINKER_TARGET_NAME_LEN + 1, "Tag ...%s", suffix);
+                        tagtinker_target_set_default_name(target);
                     }
 
                     tagtinker_target_refresh_profile(target);
@@ -367,6 +589,7 @@ static TagTinkerApp* app_alloc(void) {
     app->invert_text = false;
     strcpy(app->text_input_buf, "TagTinker");
     app->selected_target = -1;
+    app->ble_sync_ready_target = -1;
     tagtinker_settings_load(app);
     tagtinker_targets_load(app);
 
@@ -386,6 +609,7 @@ static TagTinkerApp* app_alloc(void) {
 
     /* Notifications */
     app->notifications = furi_record_open(RECORD_NOTIFICATION);
+    app->bt = furi_record_open(RECORD_BT);
 
     /* Views */
     app->submenu = submenu_alloc();
@@ -465,6 +689,9 @@ static void app_free(TagTinkerApp* app) {
     furi_record_close(RECORD_GUI);
     furi_record_close(RECORD_NOTIFICATION);
     furi_record_close(RECORD_DIALOGS);
+    if(app->bt) {
+        furi_record_close(RECORD_BT);
+    }
 
     view_free(app->warning_view);
     view_free(app->transmit_view);

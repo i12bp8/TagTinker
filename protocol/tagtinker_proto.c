@@ -1,7 +1,10 @@
 /*
- * TagTinker - ESL protocol helpers (implementation)
+ * ESL protocol helpers.
  *
- * Ported from furrtek/TagTinker tools_python/pr.py and img2dm.py
+ * This file covers three jobs:
+ * 1. Decode a barcode into the tag address and known display profile.
+ * 2. Pack pixels into the tag's raw or RLE bitmap format.
+ * 3. Wrap those bytes into the IR frames that the tag understands.
  *
  * SPDX-License-Identifier: MIT
  */
@@ -11,8 +14,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-/* ── Helpers ────────────────────────────────────────────────── */
-
 typedef struct {
     uint16_t type_code;
     uint16_t width;
@@ -21,6 +22,7 @@ typedef struct {
     TagTinkerTagColor color;
 } TagTinkerProfileEntry;
 
+/* Known type codes seen in ESL barcodes. */
 static const TagTinkerProfileEntry profile_table[] = {
     {1206, 0,   0,   TagTinkerTagKindSegment,   TagTinkerTagColorMono},
     {1207, 0,   0,   TagTinkerTagKindSegment,   TagTinkerTagColorMono},
@@ -86,6 +88,7 @@ static size_t terminate(uint8_t* buf, size_t len) {
 
 static size_t raw_frame(uint8_t* buf, uint8_t proto,
                         const uint8_t plid[4], uint8_t cmd) {
+    /* Every addressed frame starts with protocol byte, PLID, then command. */
     buf[0] = proto;
     buf[1] = plid[3]; buf[2] = plid[2];
     buf[3] = plid[1]; buf[4] = plid[0];
@@ -94,6 +97,7 @@ static size_t raw_frame(uint8_t* buf, uint8_t proto,
 }
 
 static size_t mcu_frame(uint8_t* buf, const uint8_t plid[4], uint8_t cmd) {
+    /* Image upload is tunneled through command 0x34 with an inner MCU opcode. */
     size_t p = raw_frame(buf, TAGTINKER_PROTO_DM, plid, 0x34);
     buf[p++] = 0x00;
     buf[p++] = 0x00;
@@ -101,8 +105,6 @@ static size_t mcu_frame(uint8_t* buf, const uint8_t plid[4], uint8_t cmd) {
     buf[p++] = cmd;
     return p;
 }
-
-/* ── CRC-16 (poly 0x8408, init 0x8408) ─────────────────────── */
 
 uint16_t tagtinker_crc16(const uint8_t* data, size_t len) {
     uint16_t crc = 0x8408;
@@ -113,8 +115,6 @@ uint16_t tagtinker_crc16(const uint8_t* data, size_t len) {
     }
     return crc;
 }
-
-/* ── Barcode → PLID ─────────────────────────────────────────── */
 
 bool tagtinker_barcode_to_plid(const char* barcode, uint8_t plid[4]) {
     if(!barcode || strlen(barcode) != 17) return false;
@@ -165,8 +165,6 @@ bool tagtinker_barcode_to_profile(const char* barcode, TagTinkerTagProfile* prof
     profile->known = true;
     return true;
 }
-
-/* ── Frame builders ─────────────────────────────────────────── */
 
 size_t tagtinker_build_broadcast_page_frame(
     uint8_t* buf, uint8_t page, bool forever, uint16_t duration) {
@@ -231,10 +229,9 @@ static void record_run(uint8_t* out, size_t* pos, size_t cap, uint32_t run_count
     for(int i = 0; i < n / 2; i++) {
         uint8_t t = bits[i]; bits[i] = bits[n - 1 - i]; bits[n - 1 - i] = t;
     }
-    /* Prefix zeros (n-1 of them, skip leading 1) */
+    /* Runs are unary-prefixed: zeros mark bit-length, then the count bits follow. */
     for(int i = 1; i < n; i++)
         if(*pos < cap) out[(*pos)++] = 0;
-    /* The bits themselves */
     for(int i = 0; i < n; i++)
         if(*pos < cap) out[(*pos)++] = bits[i];
 }
@@ -263,10 +260,10 @@ size_t tagtinker_rle_compress(
     if(run_count > 1) record_run(out, &pos, out_cap, run_count);
 
     if(pos < count) {
-        *comp_type = 2;  /* RLE */
+        *comp_type = 2;
         return pos;
     }
-    /* Compression didn't help — use raw */
+
     memcpy(out, pixels, count < out_cap ? count : out_cap);
     *comp_type = 0;
     return count < out_cap ? count : out_cap;
@@ -411,6 +408,7 @@ bool tagtinker_encode_planes_payload(
     if(mode == TagTinkerCompressionRle) {
         use_compressed = true;
     } else if(mode == TagTinkerCompressionAuto) {
+        /* Auto mode picks RLE only when it is smaller than the raw bitstream. */
         use_compressed = (comp_len > 0U) && (comp_len < total_pixels);
     }
     size_t src_len = use_compressed ? comp_len : total_pixels;
@@ -474,6 +472,7 @@ size_t tagtinker_make_image_param_frame(
     uint16_t height,
     uint16_t pos_x,
     uint16_t pos_y) {
+    /* Command 0x05 tells the tag how many bytes are coming and where to place them. */
     size_t p = mcu_frame(buf, plid, 0x05);
     append_word(buf, &p, byte_count);
     buf[p++] = 0x00;
@@ -495,14 +494,13 @@ size_t tagtinker_make_image_data_frame(
     const uint8_t plid[4],
     uint16_t frame_index,
     const uint8_t data_bytes[20]) {
+    /* Command 0x20 carries one fixed 20-byte image block. */
     size_t p = mcu_frame(buf, plid, 0x20);
     append_word(buf, &p, frame_index);
     memcpy(&buf[p], data_bytes, DATA_BYTES_PER_FRAME);
     p += DATA_BYTES_PER_FRAME;
     return terminate(buf, p);
 }
-
-/* ── Image upload sequence builder ──────────────────────────── */
 
 void tagtinker_build_image_sequence(
     TagTinkerApp* app,
@@ -517,6 +515,8 @@ void tagtinker_build_image_sequence(
     if(!tagtinker_encode_image_payload(
            pixels, width, height, app->color_clear, app->compression_mode, &payload))
         return;
+
+    /* The tag expects 20 data bytes per frame, so pad the payload to that boundary. */
     size_t frame_count = payload.byte_count / DATA_BYTES_PER_FRAME;
 
     FURI_LOG_I("TagTinker", "IMG %ux%u pg=%u comp=%u %zu->%zu frames=%zu",
@@ -528,7 +528,6 @@ void tagtinker_build_image_sequence(
         payload.byte_count,
         frame_count);
 
-    /* Total: ping + params + N data + refresh */
     size_t total = 2 + frame_count + 1;
 
     app->frame_seq_count = total;
@@ -544,13 +543,13 @@ void tagtinker_build_image_sequence(
 
     size_t idx = 0;
 
-    /* 1. Ping */
+    /* Wake the tag before sending the upload. */
     app->frame_sequence[idx] = malloc(TAGTINKER_MAX_FRAME_SIZE);
     app->frame_lengths[idx]  = tagtinker_make_ping_frame(app->frame_sequence[idx], plid);
     app->frame_repeats[idx]  = wake_repeats;
     idx++;
 
-    /* 2. Parameters (cmd 0x05) */
+    /* The parameter frame describes size, page, compression mode, and placement. */
     app->frame_sequence[idx] = malloc(TAGTINKER_MAX_FRAME_SIZE);
     app->frame_lengths[idx] = tagtinker_make_image_param_frame(
         app->frame_sequence[idx],
@@ -565,22 +564,21 @@ void tagtinker_build_image_sequence(
     app->frame_repeats[idx] = 1;
     idx++;
 
-    /* 3..N+2. Data frames (cmd 0x20) */
+    /* Data frames follow in order and carry the packed bitmap bytes. */
     for(size_t fi = 0; fi < frame_count; fi++) {
         app->frame_sequence[idx] = malloc(TAGTINKER_MAX_FRAME_SIZE);
         size_t start = fi * DATA_BYTES_PER_FRAME;
         app->frame_lengths[idx] = tagtinker_make_image_data_frame(
             app->frame_sequence[idx], plid, (uint16_t)fi, &payload.data[start]);
-        app->frame_repeats[idx] = 3;  /* 3 repeats per data frame for reliability */
+        app->frame_repeats[idx] = 3;
         idx++;
     }
 
-    /* N+3. Refresh */
+    /* Refresh asks the tag to display the uploaded image. */
     app->frame_sequence[idx] = malloc(TAGTINKER_MAX_FRAME_SIZE);
     app->frame_lengths[idx]  = tagtinker_make_refresh_frame(app->frame_sequence[idx], plid);
     app->frame_repeats[idx]  = 1;
 
-    /* Copy first data frame for display in TX scene */
     if(app->frame_seq_count > 1) {
         memcpy(app->frame_buf, app->frame_sequence[1],
                app->frame_lengths[1] < TAGTINKER_MAX_FRAME_SIZE

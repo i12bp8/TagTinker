@@ -1,14 +1,5 @@
 /*
- * TagTinker - number lock barcode input view
- *
- * Custom view for entering a 17-character ESL barcode.
- * Format: Letter + 16 digits.
- *
- * Controls:
- *   UP/DOWN   - cycle digit 0-9
- *   LEFT/RIGHT - move cursor position
- *   OK        - confirm barcode
- *   BACK      - cancel
+ * Barcode input view.
  */
 
 #pragma once

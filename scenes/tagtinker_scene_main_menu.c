@@ -23,10 +23,10 @@ void tagtinker_scene_main_menu_on_enter(void* ctx) {
     submenu_reset(app->submenu);
     submenu_set_header(app->submenu, TAGTINKER_DISPLAY_NAME " v" TAGTINKER_VERSION);
 
-    submenu_add_item(app->submenu, "Broadcast Tag", MainMenuBroadcast, main_menu_cb, app);
-    submenu_add_item(app->submenu, "Target Tag", MainMenuTargetESL, main_menu_cb, app);
+    submenu_add_item(app->submenu, "Broadcast Payloads", MainMenuBroadcast, main_menu_cb, app);
+    submenu_add_item(app->submenu, "Targeted Payloads", MainMenuTargetESL, main_menu_cb, app);
+    submenu_add_item(app->submenu, "Phone Sync", MainMenuAndroid, main_menu_cb, app);
     submenu_add_item(app->submenu, "Settings", MainMenuSettings, main_menu_cb, app);
-    submenu_add_item(app->submenu, "Android App", MainMenuAndroid, main_menu_cb, app);
     submenu_add_item(app->submenu, "About", MainMenuAbout, main_menu_cb, app);
 
     submenu_set_selected_item(

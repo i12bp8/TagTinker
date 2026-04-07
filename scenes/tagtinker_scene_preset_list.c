@@ -1,15 +1,11 @@
 /*
- * Preset List — first screen after "Push Text".
- *
- * Shows saved presets (click = instant transmit with saved text + settings).
- * "[+] Add New Preset" goes to text input → size picker → save.
+ * Text preset list.
  */
 
 #include "../tagtinker_app.h"
 #define EVT_ADD_NEW  200
 #define EVT_PRESET   0
 
-/* Load presets from SD card */
 static void presets_load(TagTinkerApp* app) {
     app->preset_count = 0;
 
@@ -57,7 +53,6 @@ static void preset_list_cb(void* ctx, uint32_t index) {
     view_dispatcher_send_custom_event(app->view_dispatcher, index);
 }
 
-/* Static label storage */
 static char preset_labels[TAGTINKER_MAX_PRESETS][48];
 
 void tagtinker_scene_preset_list_on_enter(void* ctx) {
@@ -68,11 +63,9 @@ void tagtinker_scene_preset_list_on_enter(void* ctx) {
     submenu_reset(app->submenu);
     submenu_set_header(app->submenu, "Text Presets");
 
-    /* Add New Preset option first */
     submenu_add_item(app->submenu, "[+] New Preset",
         EVT_ADD_NEW, preset_list_cb, app);
 
-    /* Saved presets */
     for(uint8_t i = 0; i < app->preset_count; i++) {
         snprintf(preset_labels[i], sizeof(preset_labels[i]),
             "%ux%u \"%s\"",
@@ -91,17 +84,14 @@ bool tagtinker_scene_preset_list_on_event(void* ctx, SceneManagerEvent event) {
     if(event.type != SceneManagerEventTypeCustom) return false;
 
     if(event.event == EVT_ADD_NEW) {
-        /* Clear text buffer and go to text input */
         memset(app->text_input_buf, 0, sizeof(app->text_input_buf));
         scene_manager_set_scene_state(app->scene_manager, TagTinkerSceneTextInput, 0);
         scene_manager_next_scene(app->scene_manager, TagTinkerSceneTextInput);
         return true;
     }
 
-    /* Preset selected — load text + settings and transmit */
     uint32_t idx = event.event - EVT_PRESET;
     if(idx < app->preset_count) {
-        /* Load preset into app state */
         app->esl_width = app->presets[idx].width;
         app->esl_height = app->presets[idx].height;
         app->img_page = app->presets[idx].page;

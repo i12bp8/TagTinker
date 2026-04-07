@@ -5,9 +5,16 @@
 *.fap
 *.map
 dist/
+build/
 
 # ufbt
 .ufbt/
+
+# Android companion
+android-companion/.gradle/
+android-companion/build/
+android-companion/app/build/
+android-companion/local.properties
 
 # IDE
 .vscode/

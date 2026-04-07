@@ -1,5 +1,5 @@
 /*
- * TagTinker — Scene Definitions
+ * Scene definitions.
  */
 
 #pragma once
@@ -17,15 +17,14 @@ typedef enum {
     TagTinkerSceneBarcodeInput,
     TagTinkerSceneTextInput,
     TagTinkerScenePresetList,
+    TagTinkerSceneSyncedImageList,
     TagTinkerSceneSizePicker,
-    TagTinkerSceneImageUpload,
     TagTinkerSceneImageOptions,
     TagTinkerSceneTransmit,
     TagTinkerSceneAbout,
     TagTinkerSceneCount,
 } TagTinkerScene;
 
-/* Scene handler declarations */
 void tagtinker_scene_warning_on_enter(void* ctx);
 bool tagtinker_scene_warning_on_event(void* ctx, SceneManagerEvent event);
 void tagtinker_scene_warning_on_exit(void* ctx);
@@ -70,9 +69,9 @@ void tagtinker_scene_preset_list_on_enter(void* ctx);
 bool tagtinker_scene_preset_list_on_event(void* ctx, SceneManagerEvent event);
 void tagtinker_scene_preset_list_on_exit(void* ctx);
 
-void tagtinker_scene_image_upload_on_enter(void* ctx);
-bool tagtinker_scene_image_upload_on_event(void* ctx, SceneManagerEvent event);
-void tagtinker_scene_image_upload_on_exit(void* ctx);
+void tagtinker_scene_synced_image_list_on_enter(void* ctx);
+bool tagtinker_scene_synced_image_list_on_event(void* ctx, SceneManagerEvent event);
+void tagtinker_scene_synced_image_list_on_exit(void* ctx);
 
 void tagtinker_scene_image_options_on_enter(void* ctx);
 bool tagtinker_scene_image_options_on_event(void* ctx, SceneManagerEvent event);
