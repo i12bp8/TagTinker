@@ -7,7 +7,7 @@
  * App by I12BP8 - github.com/i12bp8
  * Research by furrtek - github.com/furrtek
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-only
  */
 
 #include "tagtinker_app.h"

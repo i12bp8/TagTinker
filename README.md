@@ -57,6 +57,16 @@ This README intentionally avoids deployment-oriented instructions and excludes g
 - Small, modular codebase suitable for further research
 - Research-first project structure with clear scope boundaries
 
+## FAQ
+
+**Where is the `.fap` release?**
+
+The Flipper app is source-first. Build the `.fap` yourself from this repository with `ufbt` so it matches your firmware and local toolchain.
+
+**What if it crashes or behaves oddly?**
+
+The maintainer primarily uses TagTinker on Momentum firmware with asset packs disabled and has not had issues in that setup. If you are using a different firmware branch, custom asset packs, or a heavily modified device setup, start by testing from a clean baseline.
+
 ## How It Works
 
 TagTinker is built around the study of **infrared electronic shelf-label communication** used by fixed-transmitter labeling systems.

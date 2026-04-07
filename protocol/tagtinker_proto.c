@@ -6,7 +6,7 @@
  * 2. Pack pixels into the tag's raw or RLE bitmap format.
  * 3. Wrap those bytes into the IR frames that the tag understands.
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-only
  */
 
 #include "tagtinker_proto.h"
