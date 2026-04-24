@@ -10,12 +10,9 @@ build/
 # ufbt
 .ufbt/
 
-# Android companion
-android-companion/.gradle/
-android-companion/build/
-android-companion/app/build/
-android-companion/local.properties
-android-companion/release-artifacts/
+# AI Assistants
+.gemini/
+.codex/
 
 # IDE
 .vscode/
