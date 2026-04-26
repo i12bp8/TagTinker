@@ -1,0 +1,7 @@
+name = "tagtinker"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+# `npm run deploy` will publish to <name>.<account-subdomain>.workers.dev.
+# Once deployed, point the ESP firmware at the resulting URL via
+# the FAP "WiFi Setup -> Server URL" field.

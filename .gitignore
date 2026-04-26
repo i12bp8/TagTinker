@@ -7,6 +7,16 @@
 dist/
 build/
 
+# Node / Cloudflare worker
+node_modules/
+.wrangler/
+
+# ESP-IDF
+esp32-wifi-fw/sdkconfig
+esp32-wifi-fw/sdkconfig.old
+esp32-wifi-fw/managed_components/
+esp32-wifi-fw/dependencies.lock
+
 # ufbt
 .ufbt/
 
