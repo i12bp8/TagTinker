@@ -3,13 +3,13 @@ App(
     name="TagTinker",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="tagtinker_app_main",
-    requires=["gui", "notification", "dialogs", "storage", "bt"],
+    requires=["gui", "notification", "dialogs", "storage", "bt", "nfc"],
     stack_size=12 * 1024,
     fap_icon="tagtinker_10px.png",
     fap_category="Infrared",
     fap_author="i12bp8",
     fap_description="Educational ESL study tool for owned hardware",
-    fap_version="2.0",
+    fap_version="2.1",
     sources=[
         "tagtinker_app.c",
         "ir/tagtinker_ir.c",
@@ -32,5 +32,7 @@ App(
         "scenes/tagtinker_scene_text_box.c",
         "scenes/tagtinker_scene_warning.c",
         "views/numlock_input.c",
+        "nfc/tagtinker_nfc.c",
+        "scenes/tagtinker_scene_nfc_scan.c",
     ],
 )
