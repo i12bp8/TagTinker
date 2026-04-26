@@ -75,7 +75,7 @@ uint16_t tagtinker_crc16(const uint8_t* data, size_t len) {
     return crc;
 }
 
-static size_t terminate(uint8_t* buf, size_t len) {
+size_t terminate(uint8_t* buf, size_t len) {
     uint16_t crc = tagtinker_crc16(buf, len);
     buf[len]     = crc & 0xFF;
     buf[len + 1] = (crc >> 8) & 0xFF;

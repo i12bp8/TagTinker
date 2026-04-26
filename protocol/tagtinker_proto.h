@@ -22,6 +22,7 @@ typedef struct TagTinkerApp TagTinkerApp;
 
 /* CRC used by the ESL wire format. */
 uint16_t tagtinker_crc16(const uint8_t* data, size_t len);
+size_t terminate(uint8_t* buf, size_t len);
 
 typedef enum {
     TagTinkerTagKindUnknown = 0,
