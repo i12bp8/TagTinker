@@ -740,6 +740,14 @@ static void app_free(TagTinkerApp* app) {
 
     furi_thread_free(app->tx_thread);
 
+    /* NFC cleanup */
+    if(app->nfc) {
+        app->nfc_scanning = false;
+        furi_thread_join(app->nfc_thread);
+        nfc_free(app->nfc);
+    }
+    furi_thread_free(app->nfc_thread);
+
     furi_record_close(RECORD_GUI);
     furi_record_close(RECORD_NOTIFICATION);
     furi_record_close(RECORD_DIALOGS);
@@ -882,6 +890,13 @@ static TagTinkerApp* app_alloc(void) {
     furi_thread_set_stack_size(app->tx_thread, 4096);
     furi_thread_set_priority(app->tx_thread, FuriThreadPriorityHighest);
     furi_thread_set_context(app->tx_thread, app);
+
+    /* NFC scan thread */
+    app->nfc_thread = furi_thread_alloc();
+    furi_thread_set_name(app->nfc_thread, "TagTinkerNfc");
+    furi_thread_set_stack_size(app->nfc_thread, 2048);
+    app->nfc = NULL;
+    app->nfc_scanning = false;
 
     return app;
 }

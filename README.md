@@ -1,4 +1,4 @@
-# TagTinker V2.0
+# TagTinker V2.1
 
 <p align="center">
   <strong>Infrared ESL Research Toolkit for Flipper Zero</strong><br>
@@ -29,6 +29,7 @@ This tool is built for IoT security curiosity, learning about obscure protocols,
 
 - **TagTinker Flipper App:** High-performance, zero-allocation RLE streaming IR engine.
 - **TagTinker Android Companion:** Edit and dither images directly on your phone and sync them instantly to the Flipper Zero over BLE.
+- **NFC Tag Scan:** Instantly identify ESL targets by scanning their NFC tag — no manual barcode entry needed.
 - Display text, custom images, and test-patterns.
 - Support for monochrome and accent-color (red/yellow) graphics tags.
 
@@ -60,6 +61,8 @@ This project is deeply indebted to the incredible public reverse-engineering wor
 To understand the underlying protocol, signal structure, and history, please read his research:
 - **Furrtek’s ESL research:** [https://www.furrtek.org/?a=esl](https://www.furrtek.org/?a=esl)
 - **PrecIR reference implementation:** [https://github.com/furrtek/PrecIR](https://github.com/furrtek/PrecIR)
+
+NFC tag decoding contributed by **7h30th3r0n3**.
 
 ## Disclaimer
 
