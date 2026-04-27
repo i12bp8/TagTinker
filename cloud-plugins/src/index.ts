@@ -22,8 +22,11 @@ import { Plugin, AccentMode } from "./plugin";
 import { cryptoPlugin } from "./plugins/crypto";
 import { weatherPlugin } from "./plugins/weather";
 import { identiconPlugin } from "./plugins/identicon";
+import { githubPlugin } from "./plugins/github";
 
-const PLUGINS: Plugin[] = [cryptoPlugin, weatherPlugin, identiconPlugin];
+const PLUGINS: Plugin[] = [
+  cryptoPlugin, weatherPlugin, identiconPlugin, githubPlugin,
+];
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",

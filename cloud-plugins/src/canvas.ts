@@ -10,7 +10,7 @@
  * Plane 1 only allocated when accent is requested AND supported.
  */
 
-import { FONT_5x7, FONT_5x7_W, FONT_5x7_H } from "./font";
+import { FONT_5x7, FONT_5x7_W, FONT_5x7_H, FONT_EXTRA } from "./font";
 
 export type Ink = 0 | 1; // 0 = primary (black), 1 = accent (red/yellow)
 
@@ -38,9 +38,22 @@ export class Canvas {
 
   setPixel(x: number, y: number, ink: Ink = 0): void {
     if (x < 0 || y < 0 || x >= this.width || y >= this.height) return;
-    const p = this.plane(ink);
     const i = y * this.rowStride + (x >> 3);
-    p[i] |= 0x80 >> (x & 7);
+    const mask = 0x80 >> (x & 7);
+    /* Last-write-wins on tri-state pixels: setting a pixel on one plane
+     * clears the same pixel on the OTHER plane. Without this, drawing
+     * black text on top of an accent-filled badge produces undefined
+     * results on the e-paper driver (typically the accent plane wins
+     * and the text vanishes). With this rule a pixel is always exactly
+     * one of {white, black, accent}, which is what plugin authors
+     * intuitively expect when stacking primitives. */
+    if (ink === 1 && this.plane1) {
+      this.plane1[i] |= mask;
+      this.plane0[i] &= ~mask;
+    } else {
+      this.plane0[i] |= mask;
+      if (this.plane1) this.plane1[i] &= ~mask;
+    }
   }
 
   clearPixel(x: number, y: number, ink: Ink = 0): void {
@@ -48,6 +61,18 @@ export class Canvas {
     const p = this.plane(ink);
     const i = y * this.rowStride + (x >> 3);
     p[i] &= ~(0x80 >> (x & 7));
+  }
+
+  /** Force a pixel to "white" (paper) by clearing BOTH planes. Useful
+   *  for knockout text inside a coloured badge: white text on red
+   *  background = no ink at all on those pixels, just the paper
+   *  showing through. */
+  whitePixel(x: number, y: number): void {
+    if (x < 0 || y < 0 || x >= this.width || y >= this.height) return;
+    const i = y * this.rowStride + (x >> 3);
+    const mask = ~(0x80 >> (x & 7));
+    this.plane0[i] &= mask;
+    if (this.plane1) this.plane1[i] &= mask;
   }
 
   hline(x: number, y: number, w: number, ink: Ink = 0): void {
@@ -94,8 +119,16 @@ export class Canvas {
   drawText(x: number, y: number, s: string, ink: Ink = 0, scale = 1): void {
     for (let ci = 0; ci < s.length; ci++) {
       const ch = s.charCodeAt(ci);
-      const idx = ch >= 32 && ch <= 127 ? ch - 32 : 0;
-      const glyph = FONT_5x7[idx] ?? FONT_5x7[0];
+      let glyph: number[];
+      if (ch >= 32 && ch <= 127) {
+        glyph = FONT_5x7[ch - 32] ?? FONT_5x7[0];
+      } else {
+        /* Non-ASCII codepoint: try the extra glyph table (€, £, ¥, ▲, ...).
+         * Plugins can ship Unicode strings directly and this lookup
+         * keeps the per-glyph cell width identical, so textSize() math
+         * still works unchanged. */
+        glyph = FONT_EXTRA[ch] ?? FONT_5x7[0];
+      }
       for (let row = 0; row < FONT_5x7_H; row++) {
         const bits = glyph[row];
         for (let col = 0; col < FONT_5x7_W; col++) {
@@ -106,6 +139,33 @@ export class Canvas {
                   x + (ci * (FONT_5x7_W + 1) + col) * scale + dx,
                   y + row * scale + dy,
                   ink,
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /** Knockout-text version of drawText: each glyph pixel is forced to
+   *  white (clears BOTH planes). Use this when drawing a label inside
+   *  a solid coloured badge so the paper shows through the letters. */
+  drawTextWhite(x: number, y: number, s: string, scale = 1): void {
+    for (let ci = 0; ci < s.length; ci++) {
+      const ch = s.charCodeAt(ci);
+      let glyph: number[];
+      if (ch >= 32 && ch <= 127) glyph = FONT_5x7[ch - 32] ?? FONT_5x7[0];
+      else                       glyph = FONT_EXTRA[ch] ?? FONT_5x7[0];
+      for (let row = 0; row < FONT_5x7_H; row++) {
+        const bits = glyph[row];
+        for (let col = 0; col < FONT_5x7_W; col++) {
+          if (bits & (1 << (FONT_5x7_W - 1 - col))) {
+            for (let dy = 0; dy < scale; dy++) {
+              for (let dx = 0; dx < scale; dx++) {
+                this.whitePixel(
+                  x + (ci * (FONT_5x7_W + 1) + col) * scale + dx,
+                  y + row * scale + dy,
                 );
               }
             }
