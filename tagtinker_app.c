@@ -12,7 +12,59 @@
 
 #include "tagtinker_app.h"
 
+#include <furi.h>
+#include <cli/cli.h>
+#include <cli/cli_registry.h>
+#include <toolbox/args.h>
+
 #define TAGTINKER_WEB_JOB_PATH APP_DATA_PATH("web_job.txt")
+
+typedef enum {
+    TagTinkerCustomEventCliJob = 200,
+} TagTinkerCustomEvent;
+
+static bool tagtinker_try_consume_web_job(TagTinkerApp* app);
+
+static void tag_cli(PipeSide* pipe, FuriString* args, void* context) {
+    UNUSED(pipe);
+    TagTinkerApp* app = context;
+
+    FuriString* arg = furi_string_alloc();
+
+    if(!args_read_string_and_trim(args, arg)) {
+        printf("Usage: tag rawsend <hex bytes...>\r\n");
+        furi_string_free(arg);
+        return;
+    }
+
+    bool is_rawsend = furi_string_equal(arg, "rawsend");
+    furi_string_free(arg);
+
+    if(!is_rawsend) {
+        printf("Usage: tag rawsend <hex bytes...>\r\n");
+        return;
+    }
+
+    /* Compute length by counting hex chars, cap at 128 */
+    const char* str = furi_string_get_cstr(args);
+    size_t pos = 0;
+    size_t buf_pos = 0;
+    size_t slen = strlen(str);
+    while(pos < slen && buf_pos < 128) {
+        while(pos < slen && str[pos] == ' ') pos++;
+        if(pos + 2 > slen) break;
+        if(!args_char_to_hex(str[pos], str[pos + 1], &app->cli_frame_buf[buf_pos++])) break;
+        pos += 2;
+    }
+    if (buf_pos == 0) {
+        printf("No hex bytes provided\r\n");
+        return;
+    }
+
+    app->cli_frame_len = buf_pos;
+    view_dispatcher_send_custom_event(app->view_dispatcher, TagTinkerCustomEventCliJob);
+    printf("Job queued.\r\n");
+}
 
 static bool navigation_cb(void* ctx) {
     TagTinkerApp* app = ctx;
@@ -26,6 +78,14 @@ static void tick_cb(void* ctx) {
 
 static bool custom_event_cb(void* ctx, uint32_t event) {
     TagTinkerApp* app = ctx;
+    if(event == TagTinkerCustomEventCliJob && app->cli_frame_len > 0) {
+        memcpy(app->frame_buf, app->cli_frame_buf, app->cli_frame_len);
+        app->frame_len = terminate(app->frame_buf, app->cli_frame_len);
+        app->frame_seq_count = 0;
+        app->cli_frame_len = 0;
+        scene_manager_next_scene(app->scene_manager, TagTinkerSceneTransmit);
+        return true;
+    }
     return scene_manager_handle_custom_event(app->scene_manager, event);
 }
 
@@ -861,6 +921,11 @@ static TagTinkerApp* app_alloc(void) {
     /* Momentum safety: Ensure radio is idle on startup */
     bt_disconnect(app->bt);
     bt_profile_restore_default(app->bt);
+
+    /* Register CLI command */
+    CliRegistry* cli = furi_record_open(RECORD_CLI);
+    cli_registry_add_command(cli, "tag", CliCommandFlagParallelSafe, tag_cli, app);
+    furi_record_close(RECORD_CLI);
 
     app->view_dispatcher = view_dispatcher_alloc();
     app->scene_manager = scene_manager_alloc(&tagtinker_scene_handlers, app);

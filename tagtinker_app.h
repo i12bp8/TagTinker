@@ -169,6 +169,10 @@ struct TagTinkerApp {
     uint8_t frame_buf[TAGTINKER_MAX_FRAME_SIZE];
     size_t frame_len;
 
+    /* CLI raw frame input */
+    uint8_t cli_frame_buf[128];
+    size_t cli_frame_len;
+
     /* Multi-frame sequence */
     uint8_t** frame_sequence;
     size_t* frame_lengths;
