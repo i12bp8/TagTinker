@@ -322,7 +322,11 @@ void tagtinker_free_image_payload(TagTinkerImagePayload* payload) {
 
 bool tagtinker_is_barcode_valid(const char* barcode) {
     if(!barcode || strlen(barcode) != 17) return false;
-    return true;
+    int cs = 0;
+    for(int i = 0; i < 16; i++) {
+        cs += (unsigned char)barcode[i];
+    }
+    return (cs % 10) == (barcode[16] - '0');
 }
 
 size_t tagtinker_make_addressed_frame(uint8_t* buf, const uint8_t plid[4], const uint8_t* payload, size_t len) {
