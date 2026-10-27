@@ -268,6 +268,20 @@
         <h2>2 · Tag profile</h2>
         <input id="filter" type="search" placeholder="Search profile by name, code, or color…" style="margin-bottom:10px">
         <select id="profile" size="6"></select>
+        <div id="custom" hidden style="margin-top:10px">
+          <p style="font-size:12px;color:var(--text-dim);margin:0 0 8px;line-height:1.5">
+            For a tag that is not listed. Use the size shown by <b>Show Tag Info</b> or set with <b>Custom Size</b> on the Flipper.
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <input id="c-w" type="number" min="8" max="800" step="1" value="296" aria-label="Width (px)" placeholder="Width">
+            <input id="c-h" type="number" min="8" max="800" step="1" value="128" aria-label="Height (px)" placeholder="Height">
+            <select id="c-color" aria-label="Color mode">
+              <option value="mono">Mono</option>
+              <option value="red">Red</option>
+              <option value="yellow">Yellow</option>
+            </select>
+          </div>
+        </div>
         <div style="margin-top:10px">
           <div class="stat"><span>Resolution</span><span id="pf-size">—</span></div>
           <div class="stat"><span>Color mode</span><span id="pf-color">—</span></div>
@@ -415,13 +429,49 @@ function rebuildProfileList() {
     opt.textContent = `${p.code} · ${p.w}×${p.h} · ${p.color.toUpperCase()} · ${p.name}`;
     profileSel.appendChild(opt);
   });
+  /* Always offered, whatever the search: tags missing from the table
+   * (e.g. issue #49) still need a BMP of the right size. */
+  const custom = document.createElement("option");
+  custom.value = "custom";
+  custom.textContent = "Custom size… · any W×H · MONO / RED / YELLOW";
+  profileSel.appendChild(custom);
   if (profileSel.options.length && !profileSel.value) profileSel.selectedIndex = 0;
   applyProfile();
 }
-const currentProfile = () => PROFILES[parseInt(profileSel.value, 10)] ?? PROFILES[0];
+
+/* Same limits as the Flipper's Custom Size screen (TAGTINKER_CUSTOM_SIZE_MIN/MAX). */
+const CUSTOM_MIN = 8, CUSTOM_MAX = 800;
+const CUSTOM_KEY = "tagtinker.customProfile";
+function clampSize(v, fallback) {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(CUSTOM_MIN, Math.min(CUSTOM_MAX, n));
+}
+function customProfile() {
+  return {
+    code: "custom",
+    w: clampSize($("c-w").value, 296),
+    h: clampSize($("c-h").value, 128),
+    color: ["mono", "red", "yellow"].includes($("c-color").value) ? $("c-color").value : "mono",
+    name: "Custom",
+  };
+}
+function saveCustom() {
+  try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(customProfile())); } catch {}
+}
+function loadCustom() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CUSTOM_KEY) || "null");
+    if (c) { $("c-w").value = c.w; $("c-h").value = c.h; $("c-color").value = c.color; }
+  } catch {}
+}
+const currentProfile = () => profileSel.value === "custom"
+  ? customProfile()
+  : (PROFILES[parseInt(profileSel.value, 10)] ?? PROFILES[0]);
 
 function applyProfile() {
   const p = currentProfile();
+  $("custom").hidden = p.code !== "custom";
   $("pf-size").textContent  = `${p.w} × ${p.h}`;
   $("pf-color").textContent = p.color.toUpperCase();
   $("pf-type").textContent  = p.code;
@@ -435,6 +485,11 @@ function applyProfile() {
 }
 filter.addEventListener("input", rebuildProfileList);
 profileSel.addEventListener("change", applyProfile);
+["c-w", "c-h", "c-color"].forEach(id => $(id).addEventListener("input", () => { saveCustom(); applyProfile(); }));
+/* Snap out-of-range sizes back into the field once the user leaves it. */
+["c-w", "c-h"].forEach(id => $(id).addEventListener("change", () => {
+  $(id).value = clampSize($(id).value, id === "c-w" ? 296 : 128); saveCustom(); applyProfile();
+}));
 
 /* ─── Bindings ────────────────────────────────────────────────────── */
 function bindRange(id, key, fmt = v => v) {
@@ -907,6 +962,7 @@ $("dl").addEventListener("click", () => {
 });
 
 /* ─── Boot ────────────────────────────────────────────────────────── */
+loadCustom();
 rebuildProfileList();
 window.addEventListener("resize", scheduleRender);
 </script>
