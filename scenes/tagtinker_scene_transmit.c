@@ -1159,6 +1159,7 @@ bool tagtinker_scene_transmit_on_event(void* context, SceneManagerEvent event) {
             if(!cancelled) {
                 notification_message(app->notifications, ok ? &sequence_success : &sequence_error);
             }
+            tagtinker_cli_tx_finished(app, ok && !cancelled);
         }
         return true;
     }
@@ -1167,6 +1168,8 @@ bool tagtinker_scene_transmit_on_event(void* context, SceneManagerEvent event) {
 
 void tagtinker_scene_transmit_on_exit(void* context) {
     TagTinkerApp* app = context;
+    /* Leaving before the end: a waiting CLI command gets a failure. */
+    tagtinker_cli_tx_finished(app, false);
     
     app->tx_active = false;
     tagtinker_ir_stop();

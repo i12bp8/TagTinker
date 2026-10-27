@@ -100,6 +100,23 @@ The repo holds three build products plus the static web tool. A root `Makefile` 
 
 CI ([`build.yml`](.github/workflows/build.yml)) builds all three components — FAP, worker and ESP32 firmware — on every pull request and every push to `main`; the web tool deploys to GitHub Pages from `main`.
 
+## USB serial control
+
+While TagTinker is open, the Flipper CLI gets a `tagtinker` command. Use it from the qFlipper CLI, `ufbt cli`, or any serial terminal on the Flipper's USB port (close qFlipper first if you use another terminal). Sends use the normal transmit screen, so you can watch them on the Flipper and cancel with Back or Ctrl+C.
+
+```text
+tagtinker list                                  # saved tags: #, name, barcode, type, size, color
+tagtinker led 1                                 # flash the LED of tag #1
+tagtinker page all 2 forever                    # broadcast: every awake tag shows page 2
+tagtinker page "my tag" 1 30                    # one tag shows page 1 for 30 s
+tagtinker image 1 1 208x112_cat.bmp             # BMP from apps_data/tagtinker/dropped/ to page 1
+tagtinker text N4000010000213270 2 -a Hello     # text in the accent color, tag given by barcode
+tagtinker raw -r 200 85 00 00 00 00 06 49 00 00 00 01   # one raw frame, CRC added
+tagtinker stop
+```
+
+`<tag>` is the number from `list`, the tag name (quoted if it contains spaces) or the 17-character barcode; an unknown barcode is added to the saved tags. Pages use the same numbers as on the Flipper: `image` and `text` take 1-8 like `Set Text`, `page` takes 0-7 like `Broadcast → Change Page`. Each command prints `OK` or `FAILED: <reason>`.
+
 ## FAQ
 
 **Does this require a Flipper Zero?**

@@ -31,6 +31,7 @@
 #include "protocol/tagtinker_proto.h"
 #include "ir/tagtinker_ir.h"
 #include "nfc/tagtinker_nfc.h"
+#include "cli/tagtinker_cli.h"
 
 #define TAGTINKER_TAG          "TagTinker"
 #define TAGTINKER_DISPLAY_NAME "TagTinker"
@@ -140,6 +141,9 @@ struct TagTinkerApp {
     /* TX state */
     bool tx_active;
     FuriThread* tx_thread;
+
+    /* USB serial "tagtinker" command (TagTinkerCli*, see cli/tagtinker_cli.c) */
+    void* cli;
 
     /* NFC scan state */
     Nfc* nfc;

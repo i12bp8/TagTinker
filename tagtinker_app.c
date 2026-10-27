@@ -26,6 +26,7 @@ static void tick_cb(void* ctx) {
 
 static bool custom_event_cb(void* ctx, uint32_t event) {
     TagTinkerApp* app = ctx;
+    if(tagtinker_cli_handle_custom_event(app, event)) return true;
     return scene_manager_handle_custom_event(app->scene_manager, event);
 }
 
@@ -746,6 +747,9 @@ void tagtinker_recents_add(TagTinkerApp* app, const char* text) {
 }
 
 static void app_free(TagTinkerApp* app) {
+    /* First: no CLI command may touch the app while it is being freed. */
+    tagtinker_cli_unregister(app);
+
     furi_assert(app);
 
     tagtinker_free_frame_sequence(app);
@@ -962,6 +966,9 @@ static TagTinkerApp* app_alloc(void) {
     furi_thread_set_stack_size(app->nfc_thread, 2048);
     app->nfc = NULL;
     app->nfc_scanning = false;
+
+    /* USB serial control: "tagtinker help" in the Flipper CLI. */
+    tagtinker_cli_register(app);
 
     return app;
 }
