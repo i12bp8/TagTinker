@@ -71,7 +71,7 @@ Only test tags you own or are allowed to test.
 1. Build the Flipper app from this repository and install it via `ufbt`. The first launch creates `apps_data/tagtinker/dropped/` on your SD card.
 2. Open **[i12bp8.github.io/TagTinker](https://i12bp8.github.io/TagTinker/)** in any browser, pick your tag profile, drop an image, tweak, and download the BMP.
 3. Copy the BMP into `apps_data/tagtinker/dropped/` on the SD card (over `qFlipper`, USB MTP, or whatever you use).
-4. On the Flipper open `Targeted Payloads → <your tag> → Set Image`, pick the BMP, choose a page, send.
+4. On the Flipper open `Targeted Payloads`. If your tag is not listed yet, add it first with `+ Scan NFC` or `+ Type Barcode`. Then open `<your tag> → Set Image`, pick the BMP, choose a page, send.
 
 ## Development
 

@@ -7,6 +7,7 @@
 enum {
     TargetMenuScanNfc = 99,
     TargetMenuAddNew = 100,
+    TargetMenuHint = 101,
 };
 
 static void target_menu_cb(void* ctx, uint32_t index) {
@@ -18,11 +19,19 @@ void tagtinker_scene_target_menu_on_enter(void* ctx) {
     TagTinkerApp* app = ctx;
 
     submenu_reset(app->submenu);
-    submenu_set_header(app->submenu, "Targeted Payloads");
+    /* Issue #40: with no saved tag there is no "Set Image" anywhere yet, and
+     * users looked for their BMPs here. Say what to do first. */
+    submenu_set_header(
+        app->submenu, app->target_count ? "Targeted Payloads" : "Add your tag first");
 
     /* Add new target */
     submenu_add_item(app->submenu, "+ Scan NFC", TargetMenuScanNfc, target_menu_cb, app);
     submenu_add_item(app->submenu, "+ Type Barcode", TargetMenuAddNew, target_menu_cb, app);
+    if(app->target_count == 0) {
+        /* Not a command: selecting it does nothing (see on_event). */
+        submenu_add_item(
+            app->submenu, "Then: tag > Set Image", TargetMenuHint, target_menu_cb, app);
+    }
 
     /* List saved targets */
     for(uint8_t i = 0; i < app->target_count; i++) {
@@ -44,6 +53,10 @@ bool tagtinker_scene_target_menu_on_event(void* ctx, SceneManagerEvent event) {
 
     if(event.event == TargetMenuScanNfc) {
         scene_manager_next_scene(app->scene_manager, TagTinkerSceneNfcScan);
+        return true;
+    }
+
+    if(event.event == TargetMenuHint) {
         return true;
     }
 
