@@ -278,66 +278,6 @@ static bool tx_send_full_payload(
     return ok;
 }
 
-static bool tx_send_full_text_image(TagTinkerApp* app) {
-    const TagTinkerImageTxJob* job = &app->image_tx_job;
-    const TagTinkerTarget* target =
-        (app->selected_target >= 0) ? &app->targets[app->selected_target] : NULL;
-    bool accent_capable = tagtinker_target_supports_accent(target);
-    bool accent_text = accent_capable && app->color_clear;
-    bool use_second_plane = accent_capable || app->color_clear;
-    size_t pixel_count = (size_t)job->width * job->height;
-    TagTinkerTagColor accent_color = tx_target_color(app);
-
-    if(!tx_should_send_full_job(job->width, job->height, use_second_plane)) {
-        return false;
-    }
-
-    uint8_t* primary = malloc(pixel_count);
-    uint8_t* secondary = use_second_plane ? malloc(pixel_count) : NULL;
-    if(!primary || (use_second_plane && !secondary)) {
-        free(primary);
-        free(secondary);
-        return false;
-    }
-
-    if(accent_text) {
-        uint8_t bg_primary = app->invert_text ? 0 : 1;
-        uint8_t fg_primary = (accent_color == TagTinkerTagColorYellow) ? 0 : 1;
-        render_text_ex(primary, job->width, job->height, app->text_input_buf, bg_primary, fg_primary, app->text_padding_pct);
-        render_text_ex(secondary, job->width, job->height, app->text_input_buf, 1, 0, app->text_padding_pct);
-    } else {
-        render_text_ex(
-            primary,
-            job->width,
-            job->height,
-            app->text_input_buf,
-            app->invert_text ? 0 : 1,
-            app->invert_text ? 1 : 0,
-            app->text_padding_pct);
-        if(secondary) memset(secondary, 1, pixel_count);
-    }
-
-    TagTinkerImagePayload payload;
-    bool ok = tagtinker_encode_planes_payload(
-        primary, secondary, pixel_count, app->compression_mode, &payload);
-    free(primary);
-    free(secondary);
-
-    if(!ok) return false;
-
-    ok = tx_send_full_payload(
-        app,
-        job->plid,
-        &payload,
-        job->page,
-        job->width,
-        job->height,
-        job->pos_x,
-        job->pos_y);
-    tagtinker_free_image_payload(&payload);
-    return ok;
-}
-
 typedef struct {
     const uint8_t* p1;
     const uint8_t* p2;
@@ -386,15 +326,17 @@ static uint8_t tx_color26_text_pixel(size_t idx, void* ctx) {
     return tx_packed_bit(c->p2, si);
 }
 
-static bool tx_render_color26_text_plane(
+/* Render text into a 1-bit-per-pixel plane, TX_COLOR26_TEXT_ROWS rows at a
+ * time, so only a small band buffer is needed. */
+static bool tx_render_text_plane_packed(
     uint8_t* packed,
+    uint16_t w,
+    uint16_t h,
     const char* text,
     uint8_t bg,
     uint8_t fg,
     uint8_t padding_pct) {
-    const uint16_t w = TAGTINKER_COLOR26_GLASS_W;
-    const uint16_t h = TAGTINKER_COLOR26_GLASS_H;
-    memset(packed, bg ? 0xFF : 0x00, TX_COLOR26_PACKED_BYTES);
+    memset(packed, bg ? 0xFF : 0x00, ((size_t)w * h + 7U) / 8U);
 
     uint8_t* row = malloc((size_t)w * TX_COLOR26_TEXT_ROWS);
     if(!row) return false;
@@ -407,6 +349,22 @@ static bool tx_render_color26_text_plane(
     }
     free(row);
     return true;
+}
+
+static bool tx_render_color26_text_plane(
+    uint8_t* packed,
+    const char* text,
+    uint8_t bg,
+    uint8_t fg,
+    uint8_t padding_pct) {
+    return tx_render_text_plane_packed(
+        packed,
+        TAGTINKER_COLOR26_GLASS_W,
+        TAGTINKER_COLOR26_GLASS_H,
+        text,
+        bg,
+        fg,
+        padding_pct);
 }
 
 static bool tx_send_color26_text(TagTinkerApp* app) {
@@ -457,6 +415,103 @@ static bool tx_send_color26_text(TagTinkerApp* app) {
     if(!ok) return false;
 
     ok = tx_send_color26_payload(app, &payload);
+    tagtinker_free_image_payload(&payload);
+    return ok;
+}
+
+typedef struct {
+    const uint8_t* p1;
+    const uint8_t* p2; /* NULL: second plane all 1 (no accent) */
+    size_t count;
+} TxPackedPlanesCtx;
+
+static uint8_t tx_packed_planes_pixel(size_t idx, void* ctx) {
+    const TxPackedPlanesCtx* c = ctx;
+    if(idx < c->count) return tx_packed_bit(c->p1, idx);
+    if(!c->p2) return 1U;
+    return tx_packed_bit(c->p2, idx - c->count);
+}
+
+/* Whole text image in one payload. The planes are kept at 1 bit per pixel:
+ * about 6 KB for a 208x112 red tag instead of 47 KB at one byte per pixel,
+ * which did not fit in the heap left while the app runs. */
+static bool tx_send_full_text_image(TagTinkerApp* app) {
+    const TagTinkerImageTxJob* job = &app->image_tx_job;
+    const TagTinkerTarget* target =
+        (app->selected_target >= 0) ? &app->targets[app->selected_target] : NULL;
+    bool accent_capable = tagtinker_target_supports_accent(target);
+    bool accent_text = accent_capable && app->color_clear;
+    bool use_second_plane = accent_capable || app->color_clear;
+    size_t pixel_count = (size_t)job->width * job->height;
+    TagTinkerTagColor accent_color = tx_target_color(app);
+
+    if(!tx_should_send_full_job(job->width, job->height, use_second_plane)) {
+        return false;
+    }
+
+    size_t packed_bytes = (pixel_count + 7U) / 8U;
+    uint8_t* primary = malloc(packed_bytes);
+    uint8_t* secondary = accent_text ? malloc(packed_bytes) : NULL;
+    if(!primary || (accent_text && !secondary)) {
+        free(primary);
+        free(secondary);
+        return false;
+    }
+
+    bool ok;
+    if(accent_text) {
+        uint8_t bg_primary = app->invert_text ? 0 : 1;
+        uint8_t fg_primary = (accent_color == TagTinkerTagColorYellow) ? 0 : 1;
+        ok = tx_render_text_plane_packed(
+                 primary,
+                 job->width,
+                 job->height,
+                 app->text_input_buf,
+                 bg_primary,
+                 fg_primary,
+                 app->text_padding_pct) &&
+             tx_render_text_plane_packed(
+                 secondary,
+                 job->width,
+                 job->height,
+                 app->text_input_buf,
+                 1,
+                 0,
+                 app->text_padding_pct);
+    } else {
+        ok = tx_render_text_plane_packed(
+            primary,
+            job->width,
+            job->height,
+            app->text_input_buf,
+            app->invert_text ? 0 : 1,
+            app->invert_text ? 1 : 0,
+            app->text_padding_pct);
+    }
+
+    TagTinkerImagePayload payload;
+    if(ok) {
+        TxPackedPlanesCtx ctx = {.p1 = primary, .p2 = secondary, .count = pixel_count};
+        ok = tagtinker_encode_fn_payload(
+            tx_packed_planes_pixel,
+            &ctx,
+            use_second_plane ? pixel_count * 2U : pixel_count,
+            app->compression_mode,
+            &payload);
+    }
+    free(primary);
+    free(secondary);
+    if(!ok) return false;
+
+    ok = tx_send_full_payload(
+        app,
+        job->plid,
+        &payload,
+        job->page,
+        job->width,
+        job->height,
+        job->pos_x,
+        job->pos_y);
     tagtinker_free_image_payload(&payload);
     return ok;
 }
