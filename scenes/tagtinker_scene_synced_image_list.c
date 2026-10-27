@@ -225,7 +225,11 @@ void tagtinker_scene_synced_image_list_on_enter(void* ctx) {
                 sizeof(synced_image_labels[menu_idx]),
                 "%sP%u %s",
                 image->resampled ? "~ " : "",
-                image->page,
+                tagtinker_page_to_ui(
+                    (app->selected_target >= 0 && app->selected_target < app->target_count) ?
+                        &app->targets[app->selected_target].profile :
+                        NULL,
+                    image->page),
                 image->job_id);
             synced_image_menu_map[menu_idx] = (uint8_t)i;
             submenu_add_item(

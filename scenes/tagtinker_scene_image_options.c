@@ -5,14 +5,24 @@ enum {
     ImageOptionTransmit,
 };
 
+static const TagTinkerTagProfile* image_option_profile(const TagTinkerApp* app) {
+    if(app->selected_target < 0 || app->selected_target >= app->target_count) return NULL;
+    return &app->targets[app->selected_target].profile;
+}
+
+/* The list index is the protocol page (0-7); the label is the page number
+ * the user sees everywhere else (1-8 on HD tags). */
+static void image_option_set_page_text(const TagTinkerApp* app, VariableItem* item, uint8_t page) {
+    char buf[4];
+    snprintf(buf, sizeof(buf), "%u", tagtinker_page_to_ui(image_option_profile(app), page));
+    variable_item_set_current_value_text(item, buf);
+}
+
 static void image_option_page_changed(VariableItem* item) {
     TagTinkerApp* app = variable_item_get_context(item);
     app->image_tx_job.page = variable_item_get_current_value_index(item);
     app->img_page = app->image_tx_job.page;
-
-    char buf[4];
-    snprintf(buf, sizeof(buf), "%u", app->image_tx_job.page);
-    variable_item_set_current_value_text(item, buf);
+    image_option_set_page_text(app, item, app->image_tx_job.page);
 }
 
 static void image_option_enter_cb(void* ctx, uint32_t index) {
@@ -39,11 +49,7 @@ void tagtinker_scene_image_options_on_enter(void* ctx) {
     VariableItem* item =
         variable_item_list_add(list, "Page", 8, image_option_page_changed, app);
     variable_item_set_current_value_index(item, job->page);
-    {
-        char buf[4];
-        snprintf(buf, sizeof(buf), "%u", job->page);
-        variable_item_set_current_value_text(item, buf);
-    }
+    image_option_set_page_text(app, item, job->page);
 
     /* Position, compression and frame-repeat are intentionally fixed here:
      * pages are the only knob that meaningfully changes per-image, the rest

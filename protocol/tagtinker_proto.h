@@ -88,6 +88,14 @@ static inline bool tagtinker_profile_uses_ui_page(const TagTinkerTagProfile* pro
     return profile && tagtinker_type_uses_ui_page(profile->type_code);
 }
 
+/* Page number shown to the user for a protocol page. HD tags show protocol
+ * pages 0-7 as 1-8, like the text page picker: the image written to protocol
+ * page N is the one "Change Page N+1" displays (issue #26). Color 2.6 uses
+ * the UI page number on the wire, so it is shown as-is. */
+static inline uint8_t tagtinker_page_to_ui(const TagTinkerTagProfile* profile, uint8_t proto_page) {
+    return tagtinker_profile_uses_ui_page(profile) ? proto_page : (uint8_t)(proto_page + 1U);
+}
+
 static inline void tagtinker_profile_glass_size(
     const TagTinkerTagProfile* profile,
     uint16_t* width,
