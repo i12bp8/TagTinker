@@ -44,6 +44,8 @@
 #define TAGTINKER_PRESET_TEXT_LEN 32
 #define TAGTINKER_IMAGE_PATH_LEN 255
 #define TAGTINKER_SYNC_JOB_ID_LEN 32
+#define TAGTINKER_TX_PROGRESS_UNKNOWN 0xFFFFU
+#define TAGTINKER_TX_PROGRESS_FULL    1000U
 
 typedef enum {
     TagTinkerTxModeNone = 0,
@@ -54,6 +56,14 @@ typedef enum {
 typedef enum {
     TagTinkerSignalPP4 = 0,
 } TagTinkerSignalMode;
+
+/* Where the IR signal goes. Mirrors the stock Infrared app GPIO settings. */
+typedef enum {
+    TagTinkerIrOutputSettingInternal = 0, /* built-in LED */
+    TagTinkerIrOutputSettingGpioA7, /* external module on GPIO pin 2 (A7) */
+    TagTinkerIrOutputSettingAuto, /* A7 if a module is detected, else internal */
+    TagTinkerIrOutputSettingCount,
+} TagTinkerIrOutputSetting;
 
 typedef struct {
     TagTinkerTxMode mode;
@@ -140,6 +150,12 @@ struct TagTinkerApp {
     /* TX state */
     bool tx_active;
     FuriThread* tx_thread;
+    /* Send progress in permille, written by the TX thread and drawn by the
+     * transmit view. TAGTINKER_TX_PROGRESS_UNKNOWN for single commands. */
+    volatile uint16_t tx_progress;
+    /* Share of the whole send covered by the payload being sent [lo, hi]. */
+    uint16_t tx_progress_lo;
+    uint16_t tx_progress_hi;
 
     /* NFC scan state */
     Nfc* nfc;
@@ -216,6 +232,9 @@ struct TagTinkerApp {
     uint8_t data_frame_repeats;
     TagTinkerSignalMode signal_mode;
     bool show_startup_warning;
+    uint8_t ir_output_setting; /* TagTinkerIrOutputSetting */
+    bool ir_5v; /* 5V on GPIO pin 1 while sending through A7 */
+    volatile uint8_t ir_output_active; /* TagTinkerIrOutput used by the current send */
 
     /* Indicates which mode triggered raw cmd (0=broadcast, 1=targeted) */
     uint8_t raw_mode;

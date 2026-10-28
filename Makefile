@@ -84,7 +84,7 @@ IDF_ENV = idf_log=$$(mktemp) \
   && rm -f "$$idf_log"
 
 .PHONY: help setup build-fap build-worker build-esp build-all launch flash-esp \
-        serve-web lint check-worker clean distclean check-esp-env check-root worker-deps
+        serve-web lint check-worker test clean distclean check-esp-env check-root worker-deps
 
 # --- Help -------------------------------------------------------------------
 help: ## Show this help
@@ -160,6 +160,12 @@ lint: ## ADVISORY: run ufbt lint (clang-format). Fails on main by design; not a 
 
 check-worker: worker-deps ## Type-check the worker only (npx tsc --noEmit)
 	cd $(WORKER_DIR) && $(NPX) tsc --noEmit
+
+test: ## Run host unit tests (plain C, no Flipper needed) -> dist/tests/
+	@mkdir -p dist/tests
+	$(CC) -std=c99 -Wall -Wextra -Werror -O1 tests/test_ir_seq.c ir/tagtinker_ir_seq.c -lm \
+	  -o dist/tests/test_ir_seq
+	./dist/tests/test_ir_seq
 
 # --- Cleanup ----------------------------------------------------------------
 clean: check-root ## Remove build outputs only (dist/, worker dist + .wrangler, ESP build/, generated .clang-format)

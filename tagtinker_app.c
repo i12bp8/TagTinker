@@ -453,6 +453,8 @@ void tagtinker_settings_load(TagTinkerApp* app) {
     app->show_startup_warning = true;
     app->data_frame_repeats = 2;
     app->signal_mode = TagTinkerSignalPP4;
+    app->ir_output_setting = TagTinkerIrOutputSettingInternal;
+    app->ir_5v = false;
 
     if(storage_file_open(file, APP_DATA_PATH("settings.txt"), FSAM_READ, FSOM_OPEN_EXISTING)) {
         char buf[32];
@@ -460,8 +462,16 @@ void tagtinker_settings_load(TagTinkerApp* app) {
         buf[read] = '\0';
         storage_file_close(file);
 
-        int warn, rep, sig;
-        if(sscanf(buf, "%d|%d|%d", &warn, &rep, &sig) == 3) {
+        /* warn|repeats|signal[|ir_output|ir_5v]: older files have 2 or 3 fields. */
+        int warn, rep, sig, out, v5;
+        if(sscanf(buf, "%d|%d|%d|%d|%d", &warn, &rep, &sig, &out, &v5) == 5) {
+            app->show_startup_warning = (warn != 0);
+            app->data_frame_repeats = (uint16_t)rep;
+            if(out >= 0 && out < TagTinkerIrOutputSettingCount) {
+                app->ir_output_setting = (uint8_t)out;
+            }
+            app->ir_5v = (v5 != 0);
+        } else if(sscanf(buf, "%d|%d|%d", &warn, &rep, &sig) == 3) {
             app->show_startup_warning = (warn != 0);
             app->data_frame_repeats = (uint16_t)rep;
         } else if(sscanf(buf, "%d|%d", &warn, &rep) == 2) {
@@ -490,10 +500,12 @@ bool tagtinker_settings_save(const TagTinkerApp* app) {
         int len = snprintf(
             buf,
             sizeof(buf),
-            "%d|%u|%d",
+            "%d|%u|%d|%u|%d",
             app->show_startup_warning ? 1 : 0,
             app->data_frame_repeats,
-            (int)TagTinkerSignalPP4);
+            (int)TagTinkerSignalPP4,
+            app->ir_output_setting,
+            app->ir_5v ? 1 : 0);
         if(len > 0 && storage_file_write(file, buf, (uint16_t)len)) {
             ok = true;
         }

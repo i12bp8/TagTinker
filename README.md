@@ -56,9 +56,11 @@ Only test tags you own or are allowed to test.
 
 ## Features
 
-- **TagTinker Flipper App:** High-performance RLE streaming IR engine.
+- **TagTinker Flipper App:** High-performance RLE streaming IR engine. Frames are timed by hardware (TIM1 + DMA), so USB, Bluetooth and the screen keep running while a tag is updated.
+- **Progress bar:** image and text sends show how far they are, in percent; Back cancels at any time.
 - **TagTinker Image Prep (web):** Single-file, dependency-free HTML page that lists every supported tag profile, runs a full image pipeline (tone, contrast, detail, sharpen, dither, photo-grade Oklab 3-colour quantisation) and exports a Flipper-ready BMP. Hosted at **[i12bp8.github.io/TagTinker](https://i12bp8.github.io/TagTinker/)** (source: `web-image-prep/`).
 - **Drop-folder image flow:** Drop a prepared BMP into `apps_data/tagtinker/dropped/` on the Flipper SD card, then open `Targeted Payloads → <tag> → Set Image` and pick it. The Flipper rescales the 1-bit and two-plane BMPs that the image preparer exports, so one file can be sent to graphics tags of other sizes and to any page. Type 1626 (SmartTAG Color 2.6) targets only accept files up to 24 KB.
+- **External IR module:** `Settings → IR Output` sends through a module on GPIO pin 2 (A7) instead of the built-in LED, like the stock Infrared app (`Internal`, `GPIO A7` or `Auto` to detect the module). `5V on GPIO` powers modules that take 5V from pin 1. A stronger emitter gives more range and more reliable image updates.
 - **NFC Tag Scan:** Add a target by scanning the tag's NFC chip instead of typing its barcode. This works when the tag's NFC data carries an ID TagTinker can decode; otherwise use `+ Type Barcode`.
 - **WiFi Plugins (optional):** Plug a Flipper WiFi Dev Board (ESP32-S2) into the GPIO header to unlock live, network-rendered tag designs — crypto price cards, weather tiles, identicons, and more — auto-discovered by the FAP. New plugins live entirely on the cloud worker; the Flipper firmware never has to be re-flashed to add one. The dev board firmware talks to the worker named by `CONFIG_TT_CLOUD_URL`, so you can point it at your own deployment of `cloud-plugins/` instead.
 <img alt="image" src="https://raw.githubusercontent.com/i12bp8/TagTinker/refs/heads/main/PXL_20260427_092219442.jpg" />
@@ -95,10 +97,15 @@ The repo holds three build products plus the static web tool. A root `Makefile` 
 | `make build-esp` | Build the ESP32-S2 firmware → `esp32-wifi-fw/build/tagtinker_wifi.bin` |
 | `make flash-esp ESP_PORT=/dev/cu.usbserial-XXXX` | Build and flash the devboard (omit `ESP_PORT` to auto-detect) |
 | `make serve-web` | Serve the Image Prep tool at `http://localhost:8000/` |
+| `make test` | Run the host unit tests (plain C, no Flipper or SDK needed) |
 | `make lint` | Advisory `ufbt lint`; it currently fails on deliberately column-aligned code and is not a CI gate |
 | `make clean` | Remove build outputs only (keeps `.venv/`, `node_modules/` and `sdkconfig`) |
 
-CI ([`build.yml`](.github/workflows/build.yml)) builds all three components — FAP, worker and ESP32 firmware — on every pull request and every push to `main`; the web tool deploys to GitHub Pages from `main`.
+**Windows without `make`:** double-click `build_and_flash.bat` (or run it from a terminal) with the Flipper plugged in over USB and qFlipper closed. It runs `ufbt update`, builds the FAP and installs it with `ufbt launch`.
+
+**Linux / macOS without `make`:** run `./build_and_flash.sh` the same way. On Linux your user needs access to the Flipper's serial port (`/dev/ttyACM0`): add it to the `dialout` group (`uucp` on Arch), then log out and back in.
+
+CI ([`build.yml`](.github/workflows/build.yml)) builds all three components — FAP, worker and ESP32 firmware — and runs the host unit tests on every pull request and every push to `main`; the web tool deploys to GitHub Pages from `main`.
 
 ## FAQ
 

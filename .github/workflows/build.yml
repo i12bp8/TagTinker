@@ -5,7 +5,8 @@
 #   worker - Cloudflare Worker (cloud-plugins/) typecheck + wrangler dry-run bundle
 #   esp32  - ESP32-S2 WiFi devboard firmware via the ESP-IDF v5.2.8 docker image
 #   web    - syntax check of the inline JavaScript in web-image-prep/index.html
-#   lint   - `ufbt lint` (clang-format), ADVISORY ONLY - never fails the run
+#   tests  - host unit tests (`make test`) with ASan + UBSan
+#   lint  - `ufbt lint` (clang-format), ADVISORY ONLY - never fails the run
 #
 # There are deliberately NO `paths:` filters: esp32-wifi-fw/shared/tt_wifi_proto.h
 # is compiled into BOTH the FAP (via shared/tt_wifi_proto_fap.h) and the ESP
@@ -260,6 +261,21 @@ jobs:
           console.log(`${checked} inline script(s) checked, ${failed} failed`);
           process.exit(failed ? 1 : 0);
           JS
+
+  # ---------------------------------------------------------------------------
+  # Host unit tests - plain C on the runner, no Flipper SDK needed.
+  # Sanitizers catch out-of-bounds writes in the DMA table builder.
+  # ---------------------------------------------------------------------------
+  tests:
+    name: Host unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Run tests (ASan + UBSan)
+        run: make test CC="gcc -fsanitize=address,undefined -fno-sanitize-recover=all"
 
   # ---------------------------------------------------------------------------
   # clang-format lint - ADVISORY ONLY
